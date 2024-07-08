@@ -15,6 +15,11 @@ const PORT = process.env.PORT || 3001;
 app.use(bodyParser.json());
 app.use(cors());
 
+// Ruta para la raíz
+app.get('/', (req, res) => {
+  res.send('El servidor está funcionando correctamente');
+});
+
 // Ruta para obtener datos de Google Sheets
 router.post('/getData', async (req, res) => {
   try {
