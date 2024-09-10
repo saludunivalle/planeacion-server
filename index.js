@@ -162,18 +162,35 @@ router.post('/createIndicator', async (req, res) => {
     });
 
     const escOfiValues = escOfiResponse.data.values;
-    const escOfi = escOfiValues.find(row => row[0] === idEscOfi); 
+    const escOfi = escOfiValues.find(row => row[0] === idEscOfi);
 
     if (!escOfi) {
       return res.status(404).json({ status: false, message: 'Escuela u oficina no encontrada' });
     }
 
-    const nombreEscuelaOficina = escOfi[1]; 
-    const tipo = escOfi[2]; 
+    const nombreEscuelaOficina = escOfi[1];
+    const tipo = escOfi[2];
 
-    // Crear el nombre correcto del archivo de Google Sheets
+    // Obtener los IDs actuales de la hoja INDICADORES para ese id_esc_ofi
+    const indicadoresResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      range: 'INDICADORES!A1:I1000',
+    });
+
+    const indicadoresValues = indicadoresResponse.data.values;
+    const indicadoresForEscOfi = indicadoresValues
+      .slice(1) // Saltar la cabecera
+      .filter(row => row[7] === idEscOfi); // Filtrar por id_esc_ofi
+
+    const currentIds = indicadoresForEscOfi.map(row => parseInt(row[8], 10)); // Obtener los id_indicador_dep
+    const newIdIndicadorDep = currentIds.length ? Math.max(...currentIds) + 1 : 1; // Calcular el siguiente id_indicador_dep
+
+    // Generar el nuevo ID general
+    const currentGeneralIds = indicadoresValues.slice(1).map(row => parseInt(row[0], 10)); // IDs generales
+    const newId = Math.max(...currentGeneralIds) + 1;
+
     const tipoArchivo = tipo === 'Escuela' ? 'Esc' : 'Ofi';
-    const sheetName = `${year}MDE - ${tipoArchivo} ${nombreEscuelaOficina} - IndicadorNo_${Math.floor(Math.random() * 1000)}`;
+    const sheetName = `${year}MDE - ${tipoArchivo} ${nombreEscuelaOficina} - IndicadorNo_${newIdIndicadorDep}`;
 
     const drive = google.drive({ version: 'v3', auth: jwtClient });
 
@@ -181,7 +198,7 @@ router.post('/createIndicator', async (req, res) => {
     const fileMetadata = {
       name: sheetName,
       mimeType: 'application/vnd.google-apps.spreadsheet',
-      parents: ['1wBWPuy0TH3rNnQvGA9mEDgYLYxq48HgQ'], // ID de la carpeta 
+      parents: ['1wBWPuy0TH3rNnQvGA9mEDgYLYxq48HgQ'],  
     };
 
     const file = await drive.files.create({
@@ -192,23 +209,14 @@ router.post('/createIndicator', async (req, res) => {
     const spreadsheetId = file.data.id;
     const urlIndicador = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 
-    // Obtener los IDs actuales de la hoja INDICADORES
-    const indicadoresSheetId = '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM'; // ID de la hoja INDICADORES
-    const indicadoresResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: indicadoresSheetId,
-      range: 'INDICADORES!A1:A',
-    });
-
-    const currentIds = indicadoresResponse.data.values.slice(1).map(row => parseInt(row[0]));
-    const newId = Math.max(...currentIds) + 1;
-
-    // Agregar el nuevo indicador a la hoja INDICADORES (ID del objetivo decanato en `id_obj_dec`, no en `id_obj2`)
-    const newIndicator = [newId, nombre, '', id_obj_dec, responsable, coequipero, urlIndicador, idEscOfi];
+    // Agregar el nuevo indicador al final de la hoja INDICADORES
+    const newIndicator = [newId, nombre, '', id_obj_dec, responsable, coequipero, urlIndicador, idEscOfi, newIdIndicadorDep];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: indicadoresSheetId,
-      range: 'INDICADORES!A1:H1',
+      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      range: 'INDICADORES!A1:I1', // Se refiere a las columnas, pero no a filas específicas
       valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS', // Se asegura de que se inserte una nueva fila y no se reemplace nada
       resource: {
         values: [newIndicator],
       },
@@ -217,22 +225,14 @@ router.post('/createIndicator', async (req, res) => {
     // Calcular la meta trienal
     const metaTrienio = parseFloat(meta2024) + parseFloat(meta2025) + parseFloat(meta2026);
 
-    // Obtener los IDs actuales de la hoja METAS
-    const metasResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: indicadoresSheetId,
-      range: 'METAS!A1:A',
-    });
-
-    const currentMetaIds = metasResponse.data.values.slice(1).map(row => parseInt(row[0]));
-    const newMetaId = Math.max(...currentMetaIds) + 1;
-
-    // Agregar las metas a la hoja METAS
-    const newMeta = [newMetaId, newId, meta2024, '', meta2025, '', meta2026, '', metaTrienio, ''];
+    // Agregar las metas al final de la hoja METAS
+    const newMeta = [newId, newIdIndicadorDep, meta2024, '', meta2025, '', meta2026, '', metaTrienio, ''];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: indicadoresSheetId,
+      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
       range: 'METAS!A1:J1',
       valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS', // También se asegura de que se inserte una nueva fila
       resource: {
         values: [newMeta],
       },
