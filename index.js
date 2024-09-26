@@ -155,7 +155,6 @@ router.post('/createIndicator', async (req, res) => {
 
     const sheets = google.sheets({ version: 'v4', auth: jwtClient });
 
-    // Obtener el nombre de la escuela u oficina de la hoja ESC_OFI
     const escOfiResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
       range: 'ESC_OFI!A1:E1000',
@@ -171,7 +170,6 @@ router.post('/createIndicator', async (req, res) => {
     const nombreEscuelaOficina = escOfi[1];
     const tipo = escOfi[2];
 
-    // Obtener los IDs actuales de la hoja INDICADORES para ese id_esc_ofi
     const indicadoresResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
       range: 'INDICADORES!A1:I1000',
@@ -179,13 +177,12 @@ router.post('/createIndicator', async (req, res) => {
 
     const indicadoresValues = indicadoresResponse.data.values;
     const indicadoresForEscOfi = indicadoresValues
-      .slice(1) // Saltar la cabecera
-      .filter(row => row[7] === idEscOfi); // Filtrar por id_esc_ofi
+      .slice(1) 
+      .filter(row => row[7] === idEscOfi); 
 
-    const currentIds = indicadoresForEscOfi.map(row => parseInt(row[8], 10)); // Obtener los id_indicador_dep
-    const newIdIndicadorDep = currentIds.length ? Math.max(...currentIds) + 1 : 1; // Calcular el siguiente id_indicador_dep
+    const currentIds = indicadoresForEscOfi.map(row => parseInt(row[8], 10));
+    const newIdIndicadorDep = currentIds.length ? Math.max(...currentIds) + 1 : 1; 
 
-    // Generar el nuevo ID general
     const currentGeneralIds = indicadoresValues.slice(1).map(row => parseInt(row[0], 10)); // IDs generales
     const newId = Math.max(...currentGeneralIds) + 1;
 
@@ -194,20 +191,19 @@ router.post('/createIndicator', async (req, res) => {
 
     const drive = google.drive({ version: 'v3', auth: jwtClient });
 
-    // Obtener el ID de la plantilla seleccionada desde la hoja PLANTILLAS
     const plantillaResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
       range: 'PLANTILLAS!A1:D1000',
     });
 
     const plantillas = plantillaResponse.data.values;
-    const plantilla = plantillas.find(row => row[0] === plantillaId); // Buscar por el ID de la plantilla
+    const plantilla = plantillas.find(row => row[0] === plantillaId); 
 
     if (!plantilla) {
       return res.status(404).json({ status: false, message: 'Plantilla no encontrada' });
     }
 
-    const plantillaFileId = plantilla[3]; // El ID de la plantilla se encuentra en la columna D
+    const plantillaFileId = plantilla[3]; 
 
     // Crear una copia de la plantilla seleccionada en Google Drive
     const file = await drive.files.copy({
@@ -221,7 +217,6 @@ router.post('/createIndicator', async (req, res) => {
     const spreadsheetId = file.data.id;
     const urlIndicador = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 
-    // Agregar el nuevo indicador al final de la hoja INDICADORES
     const newIndicator = [newId, nombre, '', id_obj_dec, responsable, coequipero, urlIndicador, idEscOfi, newIdIndicadorDep];
 
     await sheets.spreadsheets.values.append({
@@ -234,10 +229,8 @@ router.post('/createIndicator', async (req, res) => {
       },
     });
 
-    // Calcular la meta trienal
     const metaTrienio = parseFloat(meta2024) + parseFloat(meta2025) + parseFloat(meta2026);
 
-    // Agregar las metas al final de la hoja METAS
     const newMeta = [newId, newIdIndicadorDep, meta2024, '', meta2025, '', meta2026, '', metaTrienio, ''];
 
     await sheets.spreadsheets.values.append({
@@ -250,23 +243,21 @@ router.post('/createIndicator', async (req, res) => {
       },
     });
 
-    // Escribir el currentAvance en la celda B1
     await sheets.spreadsheets.values.update({
       spreadsheetId: spreadsheetId,
-      range: 'Hoja 1!B1', // Especificar el nombre de la hoja si es necesario
+      range: 'Hoja 1!B1', 
       valueInputOption: 'RAW',
       resource: {
-        values: [[currentAvance]], // Escribe el avance actual en B1
+        values: [[currentAvance]], 
       },
     });
 
-    // Proteger las celdas A1 y B1
     const requests = [
       {
         addProtectedRange: {
           protectedRange: {
             range: {
-              sheetId: 0, // Suponiendo que estamos protegiendo la primera hoja (ID 0)
+              sheetId: 0, 
               startRowIndex: 0,
               endRowIndex: 1,
               startColumnIndex: 0,
@@ -274,7 +265,7 @@ router.post('/createIndicator', async (req, res) => {
             },
             description: 'Protección de A1 y B1',
             editors: {
-              users: [], // Aquí puedes especificar los emails que tendrán permiso para editar las celdas
+              users: [], 
             },
           },
         },
