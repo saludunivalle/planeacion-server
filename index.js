@@ -149,7 +149,7 @@ app.post('/updateMetas', async (req, res) => {
 
 router.post('/createIndicator', async (req, res) => {
   try {
-    const { nombre, oficinaEscuela, responsable, coequipero, meta2024, meta2025, meta2026, tipoOficinaEscuela, id_obj_dec } = req.body;
+    const { nombre, oficinaEscuela, responsable, coequipero, meta2024, meta2025, meta2026, tipoOficinaEscuela, id_obj_dec, plantillaId, currentAvance } = req.body;
     const year = new Date().getFullYear();
     const idEscOfi = oficinaEscuela;
 
@@ -157,8 +157,8 @@ router.post('/createIndicator', async (req, res) => {
 
     // Obtener el nombre de la escuela u oficina de la hoja ESC_OFI
     const escOfiResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM', 
-      range: 'ESC_OFI!A1:E1000', 
+      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      range: 'ESC_OFI!A1:E1000',
     });
 
     const escOfiValues = escOfiResponse.data.values;
@@ -194,16 +194,28 @@ router.post('/createIndicator', async (req, res) => {
 
     const drive = google.drive({ version: 'v3', auth: jwtClient });
 
-    // Crear el archivo en Google Drive
-    const fileMetadata = {
-      name: sheetName,
-      mimeType: 'application/vnd.google-apps.spreadsheet',
-      parents: ['1wBWPuy0TH3rNnQvGA9mEDgYLYxq48HgQ'],  
-    };
+    // Obtener el ID de la plantilla seleccionada desde la hoja PLANTILLAS
+    const plantillaResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      range: 'PLANTILLAS!A1:D1000',
+    });
 
-    const file = await drive.files.create({
-      resource: fileMetadata,
-      fields: 'id',
+    const plantillas = plantillaResponse.data.values;
+    const plantilla = plantillas.find(row => row[0] === plantillaId); // Buscar por el ID de la plantilla
+
+    if (!plantilla) {
+      return res.status(404).json({ status: false, message: 'Plantilla no encontrada' });
+    }
+
+    const plantillaFileId = plantilla[3]; // El ID de la plantilla se encuentra en la columna D
+
+    // Crear una copia de la plantilla seleccionada en Google Drive
+    const file = await drive.files.copy({
+      fileId: plantillaFileId, // Usar el ID de la plantilla
+      resource: {
+        name: sheetName,
+        parents: ['1wBWPuy0TH3rNnQvGA9mEDgYLYxq48HgQ'],  // Carpeta donde se almacenará
+      },
     });
 
     const spreadsheetId = file.data.id;
@@ -214,9 +226,9 @@ router.post('/createIndicator', async (req, res) => {
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
-      range: 'INDICADORES!A1:I1', // Se refiere a las columnas, pero no a filas específicas
+      range: 'INDICADORES!A1:I1',
       valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS', // Se asegura de que se inserte una nueva fila y no se reemplace nada
+      insertDataOption: 'INSERT_ROWS',
       resource: {
         values: [newIndicator],
       },
@@ -232,19 +244,56 @@ router.post('/createIndicator', async (req, res) => {
       spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
       range: 'METAS!A1:J1',
       valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS', // También se asegura de que se inserte una nueva fila
+      insertDataOption: 'INSERT_ROWS',
       resource: {
         values: [newMeta],
       },
     });
 
-    return res.status(200).json({ status: true, message: 'Indicador y metas creados con éxito', url: urlIndicador });
+    // Escribir el currentAvance en la celda B1
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: spreadsheetId,
+      range: 'Hoja 1!B1', // Especificar el nombre de la hoja si es necesario
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[currentAvance]], // Escribe el avance actual en B1
+      },
+    });
+
+    // Proteger las celdas A1 y B1
+    const requests = [
+      {
+        addProtectedRange: {
+          protectedRange: {
+            range: {
+              sheetId: 0, // Suponiendo que estamos protegiendo la primera hoja (ID 0)
+              startRowIndex: 0,
+              endRowIndex: 1,
+              startColumnIndex: 0,
+              endColumnIndex: 2,
+            },
+            description: 'Protección de A1 y B1',
+            editors: {
+              users: [], // Aquí puedes especificar los emails que tendrán permiso para editar las celdas
+            },
+          },
+        },
+      },
+    ];
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: spreadsheetId,
+      resource: {
+        requests,
+      },
+    });
+
+    return res.status(200).json({ status: true, message: 'Indicador y metas creados con éxito, celdas protegidas', url: urlIndicador });
   } catch (error) {
     console.error('Error creando indicador y metas:', error);
     return res.status(500).json({ status: false, message: 'Error al crear el indicador y las metas', error });
   }
 });
-
 
 app.use(router);  
 
