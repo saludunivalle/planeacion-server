@@ -21,6 +21,7 @@ const addHeadings = (people, headings) => {
     let people = null;
     if (sheetValues) people = headers ? sheetValues : sheetValues.slice(1);
     const peopleWithHeadings = addHeadings(people, headings);
+    console.log('peopleWithHeadings', peopleWithHeadings);
     return peopleWithHeadings;
   }
   

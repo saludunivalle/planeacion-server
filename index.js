@@ -35,7 +35,7 @@ app.post('/getData', async (req, res) => {
 
     const values = response.data.values;
     const data = sheetValuesToObject(values); 
-
+    console.log('Datos obtenidos de Google Sheets:', data);
     res.status(200).json({ status: true, data });
   } catch (error) {
     console.error('Error obteniendo datos de Google Sheets:', error);
