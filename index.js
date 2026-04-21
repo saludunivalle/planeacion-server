@@ -19,6 +19,7 @@ app.use(cors());
 // Ruta raíz para verificar si el servidor está funcionando
 app.get('/', (req, res) => {
   res.send('El servidor está funcionando correctamente');
+  
 });
 
 app.get('/getAllSheetsData', getAllSheetsData);
@@ -293,4 +294,5 @@ app.use(router);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend escuchando en el puerto ${PORT}`);
+  console.log('llave:', process.env.private_key);
 });
