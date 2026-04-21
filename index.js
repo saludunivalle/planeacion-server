@@ -294,5 +294,5 @@ app.use(router);
 
 app.listen(PORT, () => {
   console.log(`Servidor backend escuchando en el puerto ${PORT}`);
-  console.log('llave:', process.env.private_key);
+  
 });
