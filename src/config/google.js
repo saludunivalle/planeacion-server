@@ -11,7 +11,7 @@ const {
   client_email,
   private_key
 } = process.env;
-
+console.log(private_key)
 const authorize = () => {
   console.log(client_id, client_secret, redirect_uris, api_key);
 
