@@ -3,15 +3,16 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
 const { google } = require('googleapis');
-const { sheetValuesToObject } = require('./utils'); 
+const { sheetValuesToObject } = require('./src/utils/utils'); 
 const { config } = require('dotenv');
-const { jwtClient } = require('./google'); 
+const { jwtClient } = require('./src/config/google'); 
+const { getAllSheetsData } = require('./src/controllers/sheetsController');
 config(); 
 
 const app = express();
 const router = express.Router();
 const PORT = process.env.PORT || 3001;
-
+const spreadsheetId = process.env.spreadsheet;
 app.use(bodyParser.json()); 
 app.use(cors());
 
@@ -20,11 +21,13 @@ app.get('/', (req, res) => {
   res.send('El servidor está funcionando correctamente');
 });
 
+app.get('/getAllSheetsData', getAllSheetsData);
+
 // Ruta para obtener datos de Google Sheets
 app.post('/getData', async (req, res) => {
   try {
     const { sheetName } = req.body;
-    const spreadsheetId = '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM'; 
+    const spreadsheetId = process.env.spreadsheet;
     const range = `${sheetName}!A1:Z1000`; 
     const sheets = google.sheets({ version: 'v4', auth: jwtClient });
 
@@ -47,7 +50,7 @@ app.post('/getData', async (req, res) => {
 app.post('/updateData', async (req, res) => {
   try {
     const { updateData, id, sheetName } = req.body;
-    const spreadsheetId = '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM'; 
+    const spreadsheetId = process.env.spreadsheet;
     const range = `${sheetName}!A1:Z1000`; 
     const sheets = google.sheets({ version: 'v4', auth: jwtClient });
 
@@ -156,7 +159,7 @@ router.post('/createIndicator', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth: jwtClient });
 
     const escOfiResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      spreadsheetId: process.env.spreadsheet,
       range: 'ESC_OFI!A1:E1000',
     });
 
@@ -171,7 +174,7 @@ router.post('/createIndicator', async (req, res) => {
     const tipo = escOfi[2];
 
     const indicadoresResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      spreadsheetId: process.env.spreadsheet,
       range: 'INDICADORES!A1:I1000',
     });
 
@@ -220,7 +223,7 @@ router.post('/createIndicator', async (req, res) => {
     const newIndicator = [newId, nombre, '', id_obj_dec, responsable, coequipero, urlIndicador, idEscOfi, newIdIndicadorDep];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      spreadsheetId: process.env.spreadsheet,
       range: 'INDICADORES!A1:I1',
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
@@ -234,7 +237,7 @@ router.post('/createIndicator', async (req, res) => {
     const newMeta = [newId, newIdIndicadorDep, meta2024, '', meta2025, '', meta2026, '', metaTrienio, ''];
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId: '1sp9G8A6-hPUtnmfK7jSpAqQfoMzKR3kmYGYzhOAC6vM',
+      spreadsheetId: process.env.spreadsheet,
       range: 'METAS!A1:J1',
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
